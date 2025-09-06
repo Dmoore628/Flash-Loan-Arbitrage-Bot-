@@ -1,0 +1,5 @@
+{
+  "name": "Crypto Arbitrage Bot Simulator",
+  "description": "An autonomous, secure, and profitable cryptocurrency arbitrage bot simulator that leverages flash loans to exploit temporary price discrepancies across decentralized exchanges (DEXs). This application provides a dashboard to monitor simulated trades, track performance, and get AI-powered market analysis.",
+  "requestFramePermissions": []
+}
