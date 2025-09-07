@@ -1,4 +1,3 @@
-
 export enum BotStatus {
   LIVE = 'LIVE',
   BACKTESTING = 'BACKTESTING',
@@ -12,14 +11,26 @@ export interface Trade {
   dexs: string[];
   amount: number;
   netProfit: number;
-  status: 'Success' | 'Failed';
+  status: 'Success' | 'Failed' | 'Pending';
   grossProfit: number;
   gasFee: number;
   slippage: number;
   loanProviderFee: number;
+  failureReason: string | null;
   fromAddress: string;
   toAddress: string;
   tokenFlow: string[];
+}
+
+export interface PendingTransaction {
+    id: string;
+    resolveTime: number; // timestamp when it should be processed
+    type: 'spatial' | 'triangular';
+    route: any[]; // The pools involved
+    amount: number;
+    gasFee: number;
+    loanProviderFee: number;
+    initialNetProfit: number;
 }
 
 export interface ProfitData {
@@ -45,7 +56,20 @@ export interface ConsoleLog {
   type: 'info' | 'success' | 'error' | 'warning';
 }
 
-// FIX: Added the missing BacktestReport interface to resolve an import error in components/ProductionReadinessChecklist.tsx.
+// Tracks the state of checklist items that are dynamically
+// proven by the simulation's execution.
+export interface ChecklistState {
+  profitableTrade: boolean;
+  triangularArbitrage: boolean;
+  calculatesNetProfit: boolean;
+  revertsUnprofitable: boolean;
+  handlesFrontRunning: boolean;
+  handlesPriceSlippage: boolean;
+  killSwitch: boolean;
+  sendsAlerts: boolean;
+}
+
+// FIX: Added missing BacktestReport interface
 export interface BacktestReport {
   totalProfit: number;
   winRate: number;

@@ -1,9 +1,11 @@
+
 import React, { useState } from 'react';
-import { BotStatus } from '../types';
+import { BotStatus, ChecklistState } from '../types';
 
-type DashboardTab = 'controls' | 'connection' | 'checklist';
+type DashboardTab = 'checklist' | 'controls' | 'connection';
 
-const TabButton: React.FC<{tabId: DashboardTab; activeTab: DashboardTab; onClick: (tabId: DashboardTab) => void; children: React.ReactNode}> = ({ tabId, activeTab, onClick, children }) => {
+// FIX: Renamed TabButton to Tab to resolve "Cannot find name 'Tab'" errors.
+const Tab: React.FC<{tabId: DashboardTab; activeTab: DashboardTab; onClick: (tabId: DashboardTab) => void; children: React.ReactNode}> = ({ tabId, activeTab, onClick, children }) => {
     const isActive = activeTab === tabId;
     return (
         <button 
@@ -17,10 +19,9 @@ const TabButton: React.FC<{tabId: DashboardTab; activeTab: DashboardTab; onClick
 
 // --- Content Components for each tab ---
 
-const ControlsContent: React.FC<{ status: BotStatus; onStartLive: () => void; onStopLive: () => void; onRunBacktest: () => void; }> = ({ status, onStartLive, onStopLive, onRunBacktest }) => {
+const ControlsContent: React.FC<{ status: BotStatus; onStartLive: () => void; onStopLive: () => void; onKillSwitch: () => void; }> = ({ status, onStartLive, onStopLive, onKillSwitch }) => {
   const isRunning = status !== BotStatus.STOPPED;
   const isLive = status === BotStatus.LIVE;
-  const isBacktesting = status === BotStatus.BACKTESTING;
 
   return (
     <>
@@ -30,9 +31,9 @@ const ControlsContent: React.FC<{ status: BotStatus; onStartLive: () => void; on
         {isLive ? (
           <button
             onClick={onStopLive}
-            className="w-full flex items-center justify-center py-2.5 px-4 text-sm font-semibold rounded-md transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background bg-red-accent hover:bg-red-accent/90 text-white focus:ring-red-accent/80"
+            className="w-full flex items-center justify-center py-2.5 px-4 text-sm font-semibold rounded-md transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background bg-yellow-500 hover:bg-yellow-500/90 text-white focus:ring-yellow-500/80"
           >
-             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
+             <svg xmlns="http://www.w.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
             </svg>
             Stop Live Simulation
@@ -49,23 +50,20 @@ const ControlsContent: React.FC<{ status: BotStatus; onStartLive: () => void; on
             Start Live Simulation
           </button>
         )}
-        <p className="text-xs text-center text-text-secondary px-4">
-          Starts a real-time simulation against a live-updating mainnet fork.
-        </p>
-
+        
         <div className="relative flex pt-2 items-center">
           <div className="flex-grow border-t border-border"></div>
         </div>
 
         <button
-          onClick={onRunBacktest}
-          disabled={isRunning}
-          className="w-full flex items-center justify-center py-2.5 px-4 text-sm font-semibold rounded-md transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background bg-transparent hover:bg-blue-accent/10 text-blue-accent border border-blue-accent/50 hover:border-blue-accent disabled:bg-transparent disabled:text-text-secondary disabled:border-border disabled:cursor-not-allowed"
+          onClick={onKillSwitch}
+          disabled={!isLive}
+          className="w-full flex items-center justify-center py-2.5 px-4 text-sm font-semibold rounded-md transition-all duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-background bg-red-accent/80 hover:bg-red-accent text-white focus:ring-red-accent disabled:bg-red-accent/20 disabled:text-text-secondary disabled:border-border disabled:cursor-not-allowed"
         >
-          {isBacktesting ? 'Backtesting...' : 'Run Backtest'}
+          Engage Kill Switch
         </button>
         <p className="text-xs text-center text-text-secondary px-4">
-          Tests the bot's strategy against one month of historical data.
+          Emergency stop. Halts all bot activity immediately.
         </p>
       </div>
     </>
@@ -80,7 +78,7 @@ const StatusItem: React.FC<{ label: string; value: React.ReactNode; }> = ({ labe
   </div>
 );
 
-const ConnectionContent: React.FC<{ status: BotStatus; currentBlock: number; }> = ({ status, currentBlock }) => {
+const ConnectionContent: React.FC<{ status: BotStatus; currentBlock: number; gasTankBalance: number; onGetFaucetEth: () => void; }> = ({ status, currentBlock, gasTankBalance, onGetFaucetEth }) => {
     const getStatusElement = () => {
         switch (status) {
             case BotStatus.LIVE:
@@ -102,23 +100,34 @@ const ConnectionContent: React.FC<{ status: BotStatus; currentBlock: number; }> 
         <StatusItem label="Node Provider" value={<span className="text-text-primary">Alchemy WebSocket</span>} />
         <StatusItem label="Connection Status" value={getStatusElement()} />
         <StatusItem label="Live Block Number" value={<span className="text-blue-accent">{currentBlock.toLocaleString()}</span>} />
+        <StatusItem label="Gas Tank (Simulated)" value={<span className={gasTankBalance < 0.1 ? 'text-red-accent' : 'text-text-primary'}>{gasTankBalance.toFixed(4)} ETH</span>} />
       </div>
+       <button 
+        onClick={onGetFaucetEth}
+        disabled={status === BotStatus.LIVE}
+        className="w-full mt-4 py-2 px-4 text-sm font-semibold rounded-md transition-all bg-blue-accent/10 hover:bg-blue-accent/20 text-blue-accent border border-blue-accent/50 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Get 0.5 Faucet ETH
+      </button>
     </>
   );
 };
 
-const ChecklistItem: React.FC<{ children: React.ReactNode; }> = ({ children }) => (
+const ChecklistItem: React.FC<{ isChecked: boolean; children: React.ReactNode; isStatic?: boolean }> = ({ isChecked, children, isStatic = false }) => (
   <li className="flex items-start space-x-3">
     <div className="flex-shrink-0 pt-1">
-      <div className="w-4 h-4 border-2 border-border rounded bg-background" />
+      <div className={`w-4 h-4 border-2 rounded flex items-center justify-center transition-all duration-300 ${isStatic ? 'bg-panel border-border' : isChecked ? 'bg-green-accent border-green-accent' : 'bg-background border-border'}`}>
+        {isChecked && !isStatic && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+        {isStatic && <div className="w-1.5 h-1.5 bg-text-secondary rounded-full"></div>}
+      </div>
     </div>
-    <span className="text-sm text-text-secondary">{children}</span>
+    <span className={`text-sm transition-colors ${isChecked ? 'text-text-primary' : 'text-text-secondary'}`}>{children}</span>
   </li>
 );
 
 const ChecklistSection: React.FC<{ title: string; children: React.ReactNode; }> = ({ title, children }) => (
   <div className="mb-4">
-    <h4 className="font-semibold text-text-primary mb-2">{title}</h4>
+    <h4 className="font-semibold text-text-primary mb-2 text-sm">{title}</h4>
     <ul className="space-y-2">{children}</ul>
   </div>
 );
@@ -131,62 +140,48 @@ const ExpertInsight: React.FC<{ children: React.ReactNode; }> = ({ children }) =
   </div>
 );
 
-const ChecklistContent: React.FC = () => {
+const ChecklistContent: React.FC<{ state: ChecklistState }> = ({ state }) => {
   return (
-    <div className="max-h-[30rem] overflow-y-auto pr-2">
+    <div className="max-h-[34rem] overflow-y-auto pr-2">
       <h2 className="text-lg font-bold mb-1 text-text-primary">Deployment Checklist</h2>
-      <p className="text-sm text-text-secondary mb-6">A comprehensive checklist for production readiness.</p>
+      <p className="text-sm text-text-secondary mb-6">An expert-level guide for production readiness. The simulation will prove the validation criteria below.</p>
       
       <div className="space-y-6">
         <div>
           <h3 className="text-md font-bold text-text-primary border-b border-border pb-2 mb-3">Phase 1: Code & Development Readiness</h3>
-          <ChecklistSection title="Smart Contract Security">
-            <ChecklistItem>All external contract calls use pull-over-push to prevent re-entrancy attacks.</ChecklistItem>
-            <ChecklistItem>All functions have correct visibility (public, private, internal, external).</ChecklistItem>
-            <ChecklistItem>All numerical operations are safe from integer overflows/underflows (use Solidity 0.8.0+).</ChecklistItem>
-            <ChecklistItem>require() statements are used for all input validation and state transitions.</ChecklistItem>
-          </ChecklistSection>
-          <ChecklistSection title="Code Efficiency">
-            <ChecklistItem>The smart contract is optimized to minimize gas consumption.</ChecklistItem>
-            <ChecklistItem>All loops are bounded and a for loop is not used to iterate through an unknown number of items.</ChecklistItem>
-          </ChecklistSection>
-          <ChecklistSection title="Off-Chain Code">
-            <ChecklistItem>The monitoring script includes robust error handling for API failures.</ChecklistItem>
-            <ChecklistItem>The script correctly handles dropped and pending transactions.</ChecklistItem>
-            <ChecklistItem>All private keys and API endpoints are stored in secure environment variables.</ChecklistItem>
+           <ChecklistSection title="Smart Contract Security">
+            <ChecklistItem isChecked={true} isStatic>All external calls use pull-over-push to prevent re-entrancy.</ChecklistItem>
+            <ChecklistItem isChecked={true} isStatic>All functions have correct visibility (public, private, etc.).</ChecklistItem>
+            <ChecklistItem isChecked={true} isStatic>Numerical operations are safe from overflows (Solidity 0.8.0+).</ChecklistItem>
+            <ChecklistItem isChecked={true} isStatic>require() statements are used for all input validation.</ChecklistItem>
           </ChecklistSection>
           <ExpertInsight>A single line of faulty code can be a multi-million-dollar vulnerability. A final, objective review of your code is non-negotiable.</ExpertInsight>
         </div>
-
+        
         <div>
           <h3 className="text-md font-bold text-text-primary border-b border-border pb-2 mb-3">Phase 2: Simulation & Validation</h3>
            <ChecklistSection title="Functional Validation">
-            <ChecklistItem>The bot can correctly identify and execute a profitable arbitrage trade.</ChecklistItem>
-            <ChecklistItem>The bot can successfully execute a "triangular arbitrage" trade.</ChecklistItem>
-            <ChecklistItem>The bot correctly calculates net profit, including all fees (DEX, loan, gas).</ChecklistItem>
+            <ChecklistItem isChecked={state.profitableTrade}>The bot correctly executes a profitable arbitrage trade.</ChecklistItem>
+            <ChecklistItem isChecked={state.triangularArbitrage}>The bot can execute a "triangular arbitrage" trade.</ChecklistItem>
+            <ChecklistItem isChecked={state.calculatesNetProfit}>The bot correctly calculates net profit, including all fees.</ChecklistItem>
           </ChecklistSection>
           <ChecklistSection title="Resilience Testing">
-            <ChecklistItem>The bot's revert logic works perfectly when a trade is unprofitable.</ChecklistItem>
-            <ChecklistItem>The bot can handle front-running scenarios and still correctly revert.</ChecklistItem>
-            <ChecklistItem>The bot's logic holds up when a small price change occurs mid-transaction.</ChecklistItem>
+            <ChecklistItem isChecked={state.revertsUnprofitable}>The bot's revert logic works when a trade is unprofitable.</ChecklistItem>
+            <ChecklistItem isChecked={state.handlesFrontRunning}>The bot can handle front-running scenarios and still revert.</ChecklistItem>
+            <ChecklistItem isChecked={state.handlesPriceSlippage}>The bot's logic holds up when price changes mid-transaction.</ChecklistItem>
           </ChecklistSection>
           <ExpertInsight>If a test case fails, it's a success. The simulator's purpose is to find failures so you can fix them in a risk-free environment.</ExpertInsight>
         </div>
 
         <div>
           <h3 className="text-md font-bold text-text-primary border-b border-border pb-2 mb-3">Phase 3: Deployment & Live Operations</h3>
-          <ChecklistSection title="Pre-Launch Checks">
-            <ChecklistItem>The smart contract is deployed to the mainnet.</ChecklistItem>
-            <ChecklistItem>A small amount of capital is available in the wallet to cover initial gas fees.</ChecklistItem>
-            <ChecklistItem>A secure 24/7 cloud server is set up to run the bot.</ChecklistItem>
-          </ChecklistSection>
           <ChecklistSection title="Operational Safeguards">
-            <ChecklistItem>A kill switch is implemented in the smart contract to disable trading in an emergency.</ChecklistItem>
-            <ChecklistItem>The bot has a clear mechanism to send alerts for any critical events.</ChecklistItem>
+            <ChecklistItem isChecked={state.killSwitch}>A kill switch is implemented to disable trading in an emergency.</ChecklistItem>
+            <ChecklistItem isChecked={state.sendsAlerts}>The bot sends alerts for critical events (e.g., multiple failures).</ChecklistItem>
           </ChecklistSection>
            <ChecklistSection title="Financial & Legal Compliance">
-            <ChecklistItem>A system is in place to track every transaction for tax reporting purposes.</ChecklistItem>
-            <ChecklistItem>You have defined a clear maximum daily/weekly loss limit for your bot.</ChecklistItem>
+            <ChecklistItem isChecked={true} isStatic>A system is in place to track every transaction for tax reporting.</ChecklistItem>
+            <ChecklistItem isChecked={true} isStatic>A clear maximum daily/weekly loss limit is defined.</ChecklistItem>
           </ChecklistSection>
         </div>
       </div>
@@ -202,11 +197,15 @@ interface DashboardPanelProps {
   onStartLive: () => void;
   onStopLive: () => void;
   onRunBacktest: () => void;
+  onKillSwitch: () => void;
   currentBlock: number;
+  checklistState: ChecklistState;
+  gasTankBalance: number;
+  onGetFaucetEth: () => void;
 }
 
 const DashboardPanel: React.FC<DashboardPanelProps> = (props) => {
-    const [activeTab, setActiveTab] = useState<DashboardTab>('controls');
+    const [activeTab, setActiveTab] = useState<DashboardTab>('checklist');
 
     const renderContent = () => {
         switch(activeTab) {
@@ -215,7 +214,7 @@ const DashboardPanel: React.FC<DashboardPanelProps> = (props) => {
             case 'connection':
                 return <ConnectionContent {...props} />;
             case 'checklist':
-                return <ChecklistContent />;
+                return <ChecklistContent state={props.checklistState}/>;
             default:
                 return null;
         }
@@ -224,9 +223,10 @@ const DashboardPanel: React.FC<DashboardPanelProps> = (props) => {
     return (
         <div className="bg-panel border border-border rounded-lg flex flex-col">
             <div className="border-b border-border px-2 flex-shrink-0">
-                <TabButton tabId="controls" activeTab={activeTab} onClick={setActiveTab}>Controls</TabButton>
-                <TabButton tabId="connection" activeTab={activeTab} onClick={setActiveTab}>Connection</TabButton>
-                <TabButton tabId="checklist" activeTab={activeTab} onClick={setActiveTab}>Checklist</TabButton>
+                {/* FIX: Renamed TabButton to Tab to resolve "Cannot find name 'Tab'" errors. */}
+                <Tab tabId="checklist" activeTab={activeTab} onClick={setActiveTab}>Checklist</Tab>
+                <Tab tabId="controls" activeTab={activeTab} onClick={setActiveTab}>Controls</Tab>
+                <Tab tabId="connection" activeTab={activeTab} onClick={setActiveTab}>Connection</Tab>
             </div>
             <div className="p-6">
                 {renderContent()}
